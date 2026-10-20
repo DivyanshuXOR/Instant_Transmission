@@ -36,6 +36,7 @@
     {
       "resources": [
         "gesture/*",
+        "assets/*",
         "libs/mediapipe/*",
         "libs/mediapipe/wasm/*",
         "models/*"

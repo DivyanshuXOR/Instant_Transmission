@@ -324,40 +324,25 @@
   }
 
   // ======================================================================
-  // PROCEDURAL TELEPORT SOUND
+  // TELEPORT SOUND (from bundled MP3 asset)
   // ======================================================================
-  let audioCtx = null;
+  let teleportAudio = null;
 
   function playTeleportSound() {
     try {
-      if (!audioCtx) audioCtx = new AudioContext();
-      const ac = audioCtx;
-      const now = ac.currentTime;
-      const dur = 0.5;
-
-      const len = ac.sampleRate * dur;
-      const buf = ac.createBuffer(1, len, ac.sampleRate);
-      const d = buf.getChannelData(0);
-      for (let i = 0; i < len; i++) {
-        const t = i / ac.sampleRate;
-        const env = Math.exp(-t * 8) * Math.sin((t * Math.PI) / dur);
-        d[i] =
-          (Math.random() * 2 - 1) * env * 0.3 +
-          Math.sin(2 * Math.PI * (800 - t * 1200) * t) * env * 0.2;
+      if (!teleportAudio) {
+        // Build the URL from the extension's assets folder.
+        // In MAIN world we receive the base URL via IT_INIT_CONFIG;
+        // derive the asset path from the worker URL.
+        const base = state.workerUrl
+          ? state.workerUrl.replace(/gesture\/gesture-worker\.html$/, "")
+          : "";
+        teleportAudio = new Audio(base + "assets/teleport.mp3");
+        teleportAudio.volume = 0.6;
       }
-      const src = ac.createBufferSource();
-      src.buffer = buf;
-      const bp = ac.createBiquadFilter();
-      bp.type = "bandpass";
-      bp.frequency.setValueAtTime(2000, now);
-      bp.frequency.exponentialRampToValueAtTime(200, now + dur);
-      bp.Q.value = 2;
-      const g = ac.createGain();
-      g.gain.setValueAtTime(0.5, now);
-      g.gain.exponentialRampToValueAtTime(0.01, now + dur);
-      src.connect(bp).connect(g).connect(ac.destination);
-      src.start(now);
-      src.stop(now + dur);
+      // Restart from the beginning if already playing
+      teleportAudio.currentTime = 0;
+      teleportAudio.play().catch(() => {});
     } catch (_) {}
   }
 

@@ -32,6 +32,8 @@ import cv2
 import numpy as np
 
 MODEL_DIR = Path(__file__).resolve().parent / "models"
+ASSETS_DIR = Path(__file__).resolve().parent / "assets"
+DEFAULT_SOUND = ASSETS_DIR / "teleport.mp3"
 _BASE = "https://storage.googleapis.com/mediapipe-models/"
 MODELS = {
     "hand": ("hand_landmarker.task",
@@ -535,7 +537,9 @@ def main() -> int:
     ap.add_argument("--height", type=int, default=720)
     ap.add_argument("--fps", type=float, default=30)
     ap.add_argument("--hold", type=float, default=1.0, help="seconds to hold the pose")
-    ap.add_argument("--sound", help="audio file to play on each teleport (wav/mp3/ogg)")
+    ap.add_argument("--sound", default=str(DEFAULT_SOUND),
+                     help="audio file to play on each teleport (wav/mp3/ogg). "
+                          "Defaults to assets/teleport.mp3")
     ap.add_argument("--audio-device", help="output device name, e.g. 'CABLE Input'")
     ap.add_argument("--list-audio", action="store_true")
     ap.add_argument("--no-virtual", action="store_true", help="preview window only")
