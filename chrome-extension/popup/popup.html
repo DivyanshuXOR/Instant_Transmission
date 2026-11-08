@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Instant Transmission</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="header">
+    <span class="logo">⚡</span>
+    <h1>Instant Transmission</h1>
+  </div>
+
+  <div class="status" id="status">
+    <div class="dot" id="dot"></div>
+    <span id="status-text">Waiting for Meet…</span>
+  </div>
+
+  <div class="gesture-badge" id="gesture-badge">
+    <span class="g-icon">🤞</span>
+    <span id="gesture-text">MediaPipe: Initializing…</span>
+  </div>
+
+  <div class="controls">
+    <button id="btn-toggle" class="btn primary" disabled>
+      <span class="btn-icon">🫥</span>
+      Vanish / Reappear
+    </button>
+
+    <button id="btn-bg" class="btn secondary" disabled>
+      <span class="btn-icon">📸</span>
+      Capture Background
+    </button>
+  </div>
+
+  <div class="shortcuts">
+    <h2>Triggers</h2>
+    <div class="key-row">
+      <span class="badge">🤞 Gesture</span>
+      <span>Two fingers to forehead (hold 1s)</span>
+    </div>
+    <div class="key-row">
+      <kbd>Alt</kbd> + <kbd>G</kbd>
+      <span>Hold to charge → vanish / reappear</span>
+    </div>
+    <div class="key-row">
+      <kbd>Alt</kbd> + <kbd>B</kbd>
+      <span>Capture clean background</span>
+    </div>
+    <div class="key-row">
+      <kbd>⚡ button</kbd>
+      <span>Click floating button on Meet</span>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span class="tip">💡 Capture background with an empty frame for best results</span>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,199 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  width: 310px;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: #0d1117;
+  color: #e6edf3;
+  padding: 16px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #21262d;
+}
+
+.logo {
+  font-size: 26px;
+  filter: drop-shadow(0 0 8px rgba(79, 195, 247, 0.6));
+}
+
+h1 {
+  font-size: 15px;
+  font-weight: 600;
+  background: linear-gradient(90deg, #4fc3f7, #81d4fa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #161b22;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.gesture-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #131d27;
+  border: 1px solid #1f3a52;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #81d4fa;
+}
+
+.gesture-badge.ready {
+  background: #102619;
+  border-color: #1b4b2e;
+  color: #7ee787;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 6px;
+  background: #1b3045;
+  border: 1px solid #2f5f8a;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #79c0ff;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #484f58;
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+
+.dot.visible {
+  background: #3fb950;
+  box-shadow: 0 0 6px rgba(63, 185, 80, 0.5);
+}
+
+.dot.vanished {
+  background: #f85149;
+  box-shadow: 0 0 6px rgba(248, 81, 73, 0.5);
+  animation: pulse-red 1.5s infinite;
+}
+
+@keyframes pulse-red {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  background: #161b22;
+  color: #e6edf3;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn:hover:not(:disabled) {
+  background: #1f2937;
+  border-color: #4fc3f7;
+  box-shadow: 0 0 10px rgba(79, 195, 247, 0.15);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn.primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  border-color: #4fc3f7;
+}
+
+.btn-icon {
+  font-size: 16px;
+}
+
+.shortcuts {
+  padding: 10px 12px;
+  background: #161b22;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.shortcuts h2 {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #8b949e;
+  margin-bottom: 8px;
+}
+
+.key-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #8b949e;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.key-row:last-child {
+  margin-bottom: 0;
+}
+
+kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 11px;
+  color: #c9d1d9;
+  line-height: 1.4;
+}
+
+.key-row span {
+  margin-left: 4px;
+}
+
+.footer {
+  text-align: center;
+}
+
+.tip {
+  font-size: 11px;
+  color: #6e7681;
+  line-height: 1.4;
+}

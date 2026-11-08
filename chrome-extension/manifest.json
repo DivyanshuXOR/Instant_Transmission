@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "Instant Transmission – Goku Vanish for Google Meet",
+  "version": "1.2.0",
+  "description": "Put two fingers to your forehead on a Google Meet call to vanish with Goku's Instant Transmission effect! ⚡",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": ["https://meet.google.com/*"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "icons": {
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://meet.google.com/*"],
+      "js": ["content/camera-hook.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://meet.google.com/*"],
+      "js": ["content/bridge.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "gesture/*",
+        "libs/mediapipe/*",
+        "libs/mediapipe/wasm/*",
+        "models/*"
+      ],
+      "matches": ["https://meet.google.com/*"]
+    }
+  ]
+}
