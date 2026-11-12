@@ -2,9 +2,13 @@
 // MediaPipe Gesture Worker (Local Extension Context)
 //
 // Runs in extension context using bundled MediaPipe Tasks Vision & local models.
-// Receives ImageBitmaps from the Meet page via postMessage.
+// Receives ImageBitmaps from the video call page via postMessage.
 // Runs HandLandmarker + FaceDetector.
-// Tests if 2 fingers (index + middle) touch the forehead box.
+// Trained heuristic for Goku's Instant Transmission pose:
+//   - Index + Middle fingers extended together
+//   - Ring + Pinky curled inward
+//   - Fingertips placed on forehead / temple
+//   - Persistent face tracking memory to survive hand occlusion
 // Posts back: { type: "POSE_RESULT", poseDetected, chargeFrac, trigger }
 // ============================================================================
 
@@ -18,22 +22,26 @@ let handLandmarker = null;
 let faceDetector = null;
 let isReady = false;
 
-// HoldGate state
-const HOLD_SECONDS = 1.0;
-const DROPOUT_GRACE = 0.25;
-const RELEASE_SECONDS = 0.4;
+// HoldGate state — tuned for snappy, reliable recognition
+const HOLD_SECONDS = 0.60;     // ~600ms hold (fast anime trigger)
+const DROPOUT_GRACE = 0.50;    // 500ms grace period so tracking drops don't reset charge
+const RELEASE_SECONDS = 0.35;
 
 let holdStart = null;
 let lastPoseTime = -1e9;
 let isLocked = false;
 let chargeFrac = 0.0;
 
+// Persistent face tracking memory (prevents losing face when hand covers forehead)
+let trackedFace = null;
+let trackedFaceTime = -1e9;
+
 // Initialize MediaPipe models from local extension files
 async function init() {
   try {
     const vision = await FilesetResolver.forVisionTasks("../libs/mediapipe/wasm");
 
-    // Initialize HandLandmarker with GPU first, fallback to CPU
+    // Initialize HandLandmarker (GPU first, fallback to CPU)
     try {
       handLandmarker = await HandLandmarker.createFromOptions(vision, {
         baseOptions: {
@@ -42,9 +50,9 @@ async function init() {
         },
         runningMode: "IMAGE",
         numHands: 2,
-        minHandDetectionConfidence: 0.4,
-        minHandPresenceConfidence: 0.4,
-        minTrackingConfidence: 0.4,
+        minHandDetectionConfidence: 0.35,
+        minHandPresenceConfidence: 0.35,
+        minTrackingConfidence: 0.35,
       });
     } catch (e) {
       console.warn("[IT Gesture Worker] GPU delegate for HandLandmarker failed, using CPU:", e);
@@ -55,13 +63,13 @@ async function init() {
         },
         runningMode: "IMAGE",
         numHands: 2,
-        minHandDetectionConfidence: 0.4,
-        minHandPresenceConfidence: 0.4,
-        minTrackingConfidence: 0.4,
+        minHandDetectionConfidence: 0.35,
+        minHandPresenceConfidence: 0.35,
+        minTrackingConfidence: 0.35,
       });
     }
 
-    // Initialize FaceDetector with GPU first, fallback to CPU
+    // Initialize FaceDetector (GPU first, fallback to CPU)
     try {
       faceDetector = await FaceDetector.createFromOptions(vision, {
         baseOptions: {
@@ -69,7 +77,7 @@ async function init() {
           delegate: "GPU",
         },
         runningMode: "IMAGE",
-        minDetectionConfidence: 0.5,
+        minDetectionConfidence: 0.35, // lower threshold to detect faces even with hand touching forehead
       });
     } catch (e) {
       console.warn("[IT Gesture Worker] GPU delegate for FaceDetector failed, using CPU:", e);
@@ -79,61 +87,80 @@ async function init() {
           delegate: "CPU",
         },
         runningMode: "IMAGE",
-        minDetectionConfidence: 0.5,
+        minDetectionConfidence: 0.35,
       });
     }
 
     isReady = true;
     window.parent.postMessage({ type: "GESTURE_READY" }, "*");
-    console.log("[IT Gesture Worker] Local MediaPipe models loaded successfully! ⚡");
+    console.log("[IT Gesture Worker] Fast MediaPipe models loaded successfully! ⚡");
   } catch (err) {
     console.error("[IT Gesture Worker] Failed to initialize MediaPipe:", err);
     window.parent.postMessage({ type: "GESTURE_ERROR", error: err.message }, "*");
   }
 }
 
-// Check if index + middle fingers are together, extended, and on a forehead
+// Distance helper
+function distance(p1, p2) {
+  return Math.hypot(p1.x - p2.x, p1.y - p2.y);
+}
+
+// Check if hand matches Goku's Instant Transmission pose on forehead
 function checkFingersOnForehead(handLandmarks, faceBoxes, w, h) {
   const pts = handLandmarks.map((p) => ({ x: p.x * w, y: p.y * h }));
   const wrist = pts[0];
-  const dist = (i) => Math.hypot(pts[i].x - wrist.x, pts[i].y - wrist.y);
 
-  const palm = dist(9);
-  if (palm < 10) return false;
+  const palm = distance(pts[9], wrist);
+  if (palm < 12) return false;
 
-  // Index (8 vs 6) and Middle (12 vs 10) extended
-  const indexExt = dist(8) > 1.15 * dist(6);
-  const midExt = dist(12) > 1.15 * dist(10);
+  // 1. Index & Middle finger extended check
+  // Compare tip distance from wrist vs knuckle (PIP)
+  const indexDistTip = distance(pts[8], wrist);
+  const indexDistPip = distance(pts[6], wrist);
+  const indexDistMcp = distance(pts[5], wrist);
+  const indexExt = (indexDistTip > 1.12 * indexDistPip) || (distance(pts[8], pts[5]) > 1.2 * distance(pts[6], pts[5]));
 
-  // Ring (16 vs 14) and Pinky (20 vs 18) curled
-  const ringCurl = dist(16) < 1.05 * dist(14);
-  const pinkyCurl = dist(20) < 1.05 * dist(18);
+  const midDistTip = distance(pts[12], wrist);
+  const midDistPip = distance(pts[10], wrist);
+  const midDistMcp = distance(pts[9], wrist);
+  const midExt = (midDistTip > 1.12 * midDistPip) || (distance(pts[12], pts[9]) > 1.2 * distance(pts[10], pts[9]));
 
-  // Index & Middle fingertips close together
-  const tipsTogether = Math.hypot(pts[8].x - pts[12].x, pts[8].y - pts[12].y) < 0.6 * palm;
+  if (!indexExt || !midExt) return false;
 
-  if (!(indexExt && midExt && ringCurl && pinkyCurl && tipsTogether)) {
-    return false;
-  }
+  // 2. Index & Middle fingertips held close together
+  const tipsTogether = distance(pts[8], pts[12]) < 0.85 * palm;
+  if (!tipsTogether) return false;
 
-  // Check against forehead region of detected faces
-  const tips = [pts[8], pts[12]];
+  // 3. Ring & Pinky finger curled check
+  // In Goku's pose, the extended index & middle fingers reach significantly farther out than ring & pinky
+  const ringDistTip = distance(pts[16], wrist);
+  const pinkyDistTip = distance(pts[20], wrist);
+
+  const ringCurled = (ringDistTip < indexDistTip * 0.92) || (distance(pts[16], pts[13]) < distance(pts[8], pts[5]) * 0.7);
+  const pinkyCurled = (pinkyDistTip < midDistTip * 0.90) || (distance(pts[20], pts[17]) < distance(pts[12], pts[9]) * 0.7);
+
+  if (!ringCurled || !pinkyCurled) return false;
+
+  // 4. Forehead / Temple position check
+  // Average position of the two active fingertips
+  const tipCx = (pts[8].x + pts[12].x) / 2;
+  const tipCy = (pts[8].y + pts[12].y) / 2;
+
   for (const box of faceBoxes) {
     const fx = box.originX;
     const fy = box.originY;
     const fw = box.width;
     const fh = box.height;
 
-    // Expand upward and sideways for forehead / temple region
-    const left = fx - 0.2 * fw;
-    const right = fx + 1.2 * fw;
-    const top = fy - 0.35 * fh;
-    const bottom = fy + 0.45 * fh;
+    // Generous forehead and temple region
+    const left = fx - 0.40 * fw;
+    const right = fx + 1.40 * fw;
+    const top = fy - 0.60 * fh;
+    const bottom = fy + 0.48 * fh;
 
-    const onForehead = tips.every(
-      (t) => t.x > left && t.x < right && t.y > top && t.y < bottom
-    );
-    if (onForehead) return true;
+    if (tipCx >= left && tipCx <= right && tipCy >= top && tipCy <= bottom) {
+      return true;
+    }
   }
 
   return false;
@@ -179,11 +206,11 @@ function updateGate(poseDetected, now) {
   return false;
 }
 
-// Message handler for incoming frames from Meet page
+// Message handler for incoming frames from page
 window.addEventListener("message", async (e) => {
   if (e.data?.type !== "PROCESS_FRAME" || !isReady) return;
 
-  const { bitmap, width, height, timestamp } = e.data;
+  const { bitmap, width, height, timestamp, requestId } = e.data;
   const now = performance.now() / 1000;
 
   try {
@@ -191,10 +218,19 @@ window.addEventListener("message", async (e) => {
     const handResult = handLandmarker.detect(bitmap);
     bitmap.close(); // free ImageBitmap memory immediately
 
-    let poseDetected = false;
-    const faceBoxes = (faceResult.detections || []).map((d) => d.boundingBox);
+    let faceBoxes = (faceResult.detections || []).map((d) => d.boundingBox);
 
-    if (faceBoxes.length > 0 && handResult.landmarks) {
+    // Update face tracking memory
+    if (faceBoxes.length > 0) {
+      trackedFace = faceBoxes[0];
+      trackedFaceTime = now;
+    } else if (trackedFace && (now - trackedFaceTime < 2.0)) {
+      // Use recently tracked face to survive hand occlusion over the forehead
+      faceBoxes = [trackedFace];
+    }
+
+    let poseDetected = false;
+    if (faceBoxes.length > 0 && handResult.landmarks && handResult.landmarks.length > 0) {
       poseDetected = handResult.landmarks.some((hand) =>
         checkFingersOnForehead(hand, faceBoxes, width, height)
       );
@@ -209,6 +245,7 @@ window.addEventListener("message", async (e) => {
         chargeFrac,
         trigger,
         timestamp,
+        requestId,
       },
       "*"
     );
@@ -217,6 +254,17 @@ window.addEventListener("message", async (e) => {
     try {
       bitmap.close();
     } catch (_) {}
+    window.parent.postMessage(
+      {
+        type: "POSE_RESULT",
+        poseDetected: false,
+        chargeFrac: 0,
+        trigger: false,
+        timestamp,
+        requestId,
+      },
+      "*"
+    );
   }
 });
 

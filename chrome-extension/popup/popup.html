@@ -14,13 +14,16 @@
 
   <div class="status" id="status">
     <div class="dot" id="dot"></div>
-    <span id="status-text">Waiting for Meet…</span>
+    <span id="status-text">Open a video call…</span>
+    <span id="platform-name" class="platform-badge" style="display:none"></span>
   </div>
 
   <div class="gesture-badge" id="gesture-badge">
     <span class="g-icon">🤞</span>
     <span id="gesture-text">MediaPipe: Initializing…</span>
   </div>
+
+  <div id="popup-toast" class="popup-toast" style="display:none"></div>
 
   <div class="controls">
     <button id="btn-toggle" class="btn primary" disabled>
@@ -38,7 +41,7 @@
     <h2>Triggers</h2>
     <div class="key-row">
       <span class="badge">🤞 Gesture</span>
-      <span>Two fingers to forehead (hold 1s)</span>
+      <span>Two fingers to forehead (fast 0.6s)</span>
     </div>
     <div class="key-row">
       <kbd>Alt</kbd> + <kbd>G</kbd>
@@ -50,12 +53,16 @@
     </div>
     <div class="key-row">
       <kbd>⚡ button</kbd>
-      <span>Click floating button on Meet</span>
+      <span>Click floating button on the page</span>
     </div>
   </div>
 
   <div class="footer">
     <span class="tip">💡 Capture background with an empty frame for best results</span>
+    <div class="supported-sites">
+      <span class="supported-label">Supported:</span>
+      Meet · Zoom · Teams · Discord · WhatsApp · OmeTV · Jitsi · Slack · Messenger · Webex · Whereby · Gather · Loom
+    </div>
   </div>
 
   <script src="popup.js"></script>

@@ -1,10 +1,32 @@
 {
   "manifest_version": 3,
-  "name": "Instant Transmission – Goku Vanish for Google Meet",
-  "version": "1.2.0",
-  "description": "Put two fingers to your forehead on a Google Meet call to vanish with Goku's Instant Transmission effect! ⚡",
-  "permissions": ["storage", "activeTab"],
-  "host_permissions": ["https://meet.google.com/*"],
+  "name": "Instant Transmission – Goku Vanish for Video Calls",
+  "version": "2.1.0",
+  "description": "Put two fingers to your forehead on any video call to vanish with Goku's Instant Transmission effect! Works on Meet, Zoom, Teams, Discord, WhatsApp, OmeTV & more ⚡",
+  "permissions": ["storage", "activeTab", "tabs"],
+  "host_permissions": [
+    "https://meet.google.com/*",
+    "https://*.zoom.us/*",
+    "https://teams.microsoft.com/*",
+    "https://teams.live.com/*",
+    "https://discord.com/*",
+    "https://web.whatsapp.com/*",
+    "*://*.ome.tv/*",
+    "https://ome.tv/*",
+    "https://www.ome.tv/*",
+    "*://*.minichat.com/*",
+    "*://*.chatrandom.com/*",
+    "*://*.coomeet.com/*",
+    "https://meet.jit.si/*",
+    "https://*.onjitsi.com/*",
+    "https://app.slack.com/*",
+    "https://www.messenger.com/*",
+    "https://*.webex.com/*",
+    "https://*.whereby.com/*",
+    "https://*.around.co/*",
+    "https://*.gather.town/*",
+    "https://*.loom.com/*"
+  ],
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   },
@@ -21,15 +43,61 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://meet.google.com/*"],
+      "matches": [
+        "https://meet.google.com/*",
+        "https://*.zoom.us/*",
+        "https://teams.microsoft.com/*",
+        "https://teams.live.com/*",
+        "https://discord.com/*",
+        "https://web.whatsapp.com/*",
+        "*://*.ome.tv/*",
+        "https://ome.tv/*",
+        "https://www.ome.tv/*",
+        "*://*.minichat.com/*",
+        "*://*.chatrandom.com/*",
+        "*://*.coomeet.com/*",
+        "https://meet.jit.si/*",
+        "https://*.onjitsi.com/*",
+        "https://app.slack.com/*",
+        "https://www.messenger.com/*",
+        "https://*.webex.com/*",
+        "https://*.whereby.com/*",
+        "https://*.around.co/*",
+        "https://*.gather.town/*",
+        "https://*.loom.com/*"
+      ],
       "js": ["content/camera-hook.js"],
       "run_at": "document_start",
-      "world": "MAIN"
+      "world": "MAIN",
+      "all_frames": true
     },
     {
-      "matches": ["https://meet.google.com/*"],
+      "matches": [
+        "https://meet.google.com/*",
+        "https://*.zoom.us/*",
+        "https://teams.microsoft.com/*",
+        "https://teams.live.com/*",
+        "https://discord.com/*",
+        "https://web.whatsapp.com/*",
+        "*://*.ome.tv/*",
+        "https://ome.tv/*",
+        "https://www.ome.tv/*",
+        "*://*.minichat.com/*",
+        "*://*.chatrandom.com/*",
+        "*://*.coomeet.com/*",
+        "https://meet.jit.si/*",
+        "https://*.onjitsi.com/*",
+        "https://app.slack.com/*",
+        "https://www.messenger.com/*",
+        "https://*.webex.com/*",
+        "https://*.whereby.com/*",
+        "https://*.around.co/*",
+        "https://*.gather.town/*",
+        "https://*.loom.com/*"
+      ],
       "js": ["content/bridge.js"],
-      "run_at": "document_start"
+      "run_at": "document_start",
+      "all_frames": true
     }
   ],
   "web_accessible_resources": [
@@ -41,7 +109,29 @@
         "libs/mediapipe/wasm/*",
         "models/*"
       ],
-      "matches": ["https://meet.google.com/*"]
+      "matches": [
+        "https://meet.google.com/*",
+        "https://*.zoom.us/*",
+        "https://teams.microsoft.com/*",
+        "https://teams.live.com/*",
+        "https://discord.com/*",
+        "https://web.whatsapp.com/*",
+        "*://*.ome.tv/*",
+        "https://ome.tv/*",
+        "https://www.ome.tv/*",
+        "*://*.minichat.com/*",
+        "*://*.chatrandom.com/*",
+        "*://*.coomeet.com/*",
+        "https://meet.jit.si/*",
+        "https://*.onjitsi.com/*",
+        "https://app.slack.com/*",
+        "https://www.messenger.com/*",
+        "https://*.webex.com/*",
+        "https://*.whereby.com/*",
+        "https://*.around.co/*",
+        "https://*.gather.town/*",
+        "https://*.loom.com/*"
+      ]
     }
   ]
 }

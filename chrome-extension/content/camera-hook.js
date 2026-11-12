@@ -2,7 +2,7 @@
 // Instant Transmission — Camera Hook (MAIN world)
 //
 // Runs in the page's JS context (world: "MAIN") so it can override
-// navigator.mediaDevices.getUserMedia before Google Meet loads.
+// navigator.mediaDevices.getUserMedia before the video call application loads.
 //
 // Features:
 //   - MediaPipe gesture detection via iframe worker (two fingers on forehead)
@@ -29,11 +29,11 @@
   };
 
   const CONFIG = {
-    HOLD_SECONDS: 1.0,
+    HOLD_SECONDS: 0.60,
     EFFECT_DURATION: 0.70,
     HOTKEY: "KeyG",        // Alt+G
     BG_HOTKEY: "KeyB",     // Alt+B
-    DETECT_INTERVAL_MS: 80, // run gesture detector ~12 FPS
+    DETECT_INTERVAL_MS: 50, // run gesture detector at 20 FPS
   };
 
   // ======================================================================
@@ -355,6 +355,8 @@
       this.ready = false;
       this.busy = false;
       this.lastSent = 0;
+      this.requestId = 0;
+      this.busySince = 0;
     }
 
     init(workerUrl) {
@@ -366,6 +368,7 @@
       this.iframe.id = "it-gesture-worker-frame";
 
       window.addEventListener("message", (e) => {
+        if (e.source !== this.iframe?.contentWindow) return;
         if (e.data?.type === "GESTURE_READY") {
           this.ready = true;
           state.gestureReady = true;
@@ -373,6 +376,7 @@
           const b = document.getElementById("it-btn");
           if (b) b.title = "Instant Transmission — Hold 2 fingers to forehead, Alt+G, or click";
         } else if (e.data?.type === "POSE_RESULT") {
+          if (e.data.requestId !== this.requestId) return;
           this.busy = false;
           // Worker reports pose detection state & hold progress
           if (!state.effectActive) {
@@ -385,15 +389,21 @@
       });
 
       document.documentElement.appendChild(this.iframe);
+      // Retry the config handshake in case bridge.js ran first.
+      window.postMessage({ type: "IT_REQUEST_CONFIG" }, "*");
     }
 
     sendFrame(canvas, w, h) {
-      if (!this.ready || this.busy || !this.iframe?.contentWindow) return;
+      if (!this.ready || !this.iframe?.contentWindow) return;
 
       const now = performance.now();
+      // Recover from a worker-side exception or a dropped postMessage.
+      if (this.busy && now - this.busySince < 1500) return;
       if (now - this.lastSent < CONFIG.DETECT_INTERVAL_MS) return;
       this.lastSent = now;
       this.busy = true;
+      this.busySince = now;
+      const requestId = ++this.requestId;
 
       // Downscale frame for fast detection (320px wide)
       const scale = Math.min(1.0, 320 / w);
@@ -409,13 +419,14 @@
               width: dw,
               height: dh,
               timestamp: now,
+              requestId,
             },
             "*",
             [bitmap]
           );
         })
         .catch(() => {
-          this.busy = false;
+          if (requestId === this.requestId) this.busy = false;
         });
     }
   }
@@ -429,16 +440,16 @@
     constructor(stream) {
       this.srcStream = stream;
       this.vTrack = stream.getVideoTracks()[0];
-      const s = this.vTrack.getSettings();
-      this.w = s.width || 640;
-      this.h = s.height || 480;
+      const s = this.vTrack ? this.vTrack.getSettings() : {};
+      this.w = (s && s.width) || 640;
+      this.h = (s && s.height) || 480;
 
       // hidden video
       this.vid = document.createElement("video");
-      this.vid.srcObject = new MediaStream([this.vTrack]);
       this.vid.muted = true;
       this.vid.playsInline = true;
-      this.vid.play();
+      this.vid.autoplay = true;
+      this.vid.srcObject = new MediaStream([this.vTrack]);
 
       // canvases
       this.live = this._canvas(this.w, this.h);
@@ -449,9 +460,72 @@
       this.bCtx = this.bg.getContext("2d");
       this.bgOk = false;
 
-      // output stream (canvas → Meet)
+      // Pre-fill black so captureStream() has initial valid pixel buffer
+      this.lCtx.fillStyle = "#000000";
+      this.lCtx.fillRect(0, 0, this.w, this.h);
+      this.oCtx.fillStyle = "#000000";
+      this.oCtx.fillRect(0, 0, this.w, this.h);
+      this.bCtx.fillStyle = "#000000";
+      this.bCtx.fillRect(0, 0, this.w, this.h);
+
+      this.vid.addEventListener("loadedmetadata", () => {
+        if (this.vid.videoWidth && this.vid.videoHeight) {
+          this.w = this.vid.videoWidth;
+          this.h = this.vid.videoHeight;
+          this.live.width = this.w;
+          this.live.height = this.h;
+          this.out.width = this.w;
+          this.out.height = this.h;
+          this.bg.width = this.w;
+          this.bg.height = this.h;
+        }
+      });
+
+      this.vid.play().catch(() => {});
+
+      // output stream (canvas → WebRTC)
       this.outStream = this.out.captureStream(30);
       for (const t of stream.getAudioTracks()) this.outStream.addTrack(t);
+
+      // WebRTC Track Proxy to prevent errors on OmeTV/Zoom/Teams
+      const outTrack = this.outStream.getVideoTracks()[0];
+      if (outTrack && this.vTrack) {
+        const origStop = outTrack.stop.bind(outTrack);
+        outTrack.stop = () => {
+          origStop();
+          this.stop();
+        };
+
+        outTrack.applyConstraints = async (constraints) => {
+          try {
+            if (this.vTrack.applyConstraints) {
+              await this.vTrack.applyConstraints(constraints);
+            }
+          } catch (_) {}
+          return Promise.resolve();
+        };
+
+        outTrack.getCapabilities = () => {
+          return this.vTrack.getCapabilities ? this.vTrack.getCapabilities() : {};
+        };
+
+        outTrack.getSettings = () => {
+          const orig = this.vTrack.getSettings ? this.vTrack.getSettings() : {};
+          return {
+            ...orig,
+            width: this.w,
+            height: this.h,
+            frameRate: 30,
+          };
+        };
+
+        try {
+          Object.defineProperty(outTrack, "label", {
+            get: () => this.vTrack.label || "Instant Transmission Virtual Cam",
+            configurable: true,
+          });
+        } catch (_) {}
+      }
 
       this._running = true;
       this._raf = null;
@@ -467,10 +541,16 @@
     }
 
     captureBg() {
-      this.lCtx.drawImage(this.vid, 0, 0, this.w, this.h);
-      this.bCtx.drawImage(this.live, 0, 0);
-      this.bgOk = true;
-      console.log("[IT] Background captured ✔");
+      if (this.vid.readyState >= 2) {
+        this.lCtx.drawImage(this.vid, 0, 0, this.w, this.h);
+        this.bCtx.drawImage(this.live, 0, 0);
+        this.bgOk = true;
+        console.log("[IT] Background captured ✔");
+        _showToast("⚡ Background Captured!");
+        _broadcastState();
+        return true;
+      }
+      return false;
     }
 
     _tick() {
@@ -530,8 +610,50 @@
     stop() {
       this._running = false;
       if (this._raf) cancelAnimationFrame(this._raf);
-      this.vid.srcObject = null;
+      if (this.vid) this.vid.srcObject = null;
+      if (this.vTrack) {
+        try { this.vTrack.stop(); } catch (_) {}
+      }
+      if (this.srcStream) {
+        try { this.srcStream.getTracks().forEach((t) => t.stop()); } catch (_) {}
+      }
+      processor = null;
+      _broadcastState();
     }
+  }
+
+  // ======================================================================
+  // ON-SCREEN TOAST
+  // ======================================================================
+  function _showToast(text) {
+    let t = document.getElementById("it-toast");
+    if (!t) {
+      t = document.createElement("div");
+      t.id = "it-toast";
+      const S = t.style;
+      S.position = "fixed";
+      S.top = "20px";
+      S.left = "50%";
+      S.transform = "translateX(-50%)";
+      S.background = "linear-gradient(135deg,#0d1117,#161b22)";
+      S.color = "#81d4fa";
+      S.border = "1.5px solid #4fc3f7";
+      S.padding = "8px 18px";
+      S.borderRadius = "20px";
+      S.fontSize = "13px";
+      S.fontWeight = "600";
+      S.zIndex = "2147483647";
+      S.boxShadow = "0 0 16px rgba(79,195,247,0.5)";
+      S.transition = "all 0.3s ease";
+      S.pointerEvents = "none";
+      document.body.appendChild(t);
+    }
+    t.textContent = text;
+    t.style.opacity = "1";
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => {
+      t.style.opacity = "0";
+    }, 2200);
   }
 
   // ======================================================================
@@ -553,8 +675,22 @@
         "     🤞 Put two fingers to your forehead to vanish/reappear.\n" +
         "     ⌨ Or hold Alt+G. Alt+B to capture clean background."
     );
+    _showToast("⚡ Instant Transmission Ready!");
+    _broadcastState();
     return processor.outStream;
   };
+
+  // Polyfill / Hook legacy APIs used by older video chat sites
+  if (navigator.getUserMedia) {
+    navigator.getUserMedia = function (constraints, success, error) {
+      navigator.mediaDevices.getUserMedia(constraints).then(success).catch(error);
+    };
+  }
+  if (navigator.webkitGetUserMedia) {
+    navigator.webkitGetUserMedia = function (constraints, success, error) {
+      navigator.mediaDevices.getUserMedia(constraints).then(success).catch(error);
+    };
+  }
 
   // ======================================================================
   // KEYBOARD
@@ -594,6 +730,7 @@
         visible: state.visible,
         enabled: state.enabled,
         bgCaptured: processor?.bgOk || false,
+        cameraActive: !!(processor && processor._running),
         gestureReady: state.gestureReady,
       },
       "*"
@@ -613,13 +750,31 @@
 
     switch (e.data.type) {
       case "IT_TOGGLE":
-        if (processor && !state.effectActive) processor._trigger();
+        if (processor && !state.effectActive) {
+          processor._trigger();
+        } else if (!processor) {
+          _showToast("Turn on your camera in the call first!");
+        }
         break;
       case "IT_CAPTURE_BG":
-        if (processor) processor.captureBg();
+        if (processor && processor._running) {
+          const ok = processor.captureBg();
+          window.postMessage({ type: "IT_CAPTURE_BG_REPLY", success: ok }, "*");
+        } else {
+          _showToast("Turn on your camera in the call first!");
+          window.postMessage(
+            {
+              type: "IT_CAPTURE_BG_REPLY",
+              success: false,
+              error: "Camera not active yet. Start video in your call first!",
+            },
+            "*"
+          );
+        }
         break;
       case "IT_SET_ENABLED":
         state.enabled = !!e.data.enabled;
+        _broadcastState();
         break;
       case "IT_GET_STATE":
         _broadcastState();
@@ -632,8 +787,10 @@
   // ======================================================================
   function _injectBtn() {
     if (document.getElementById("it-btn")) return;
-    const b = document.createElement("div");
+    const b = document.createElement("button");
     b.id = "it-btn";
+    b.type = "button";
+    b.setAttribute("aria-label", "Instant Transmission");
     b.innerHTML = "⚡";
     b.title = "Instant Transmission — Hold 2 fingers to forehead, Alt+G, or click";
     const S = b.style;
@@ -650,10 +807,15 @@
     S.justifyContent = "center";
     S.fontSize = "22px";
     S.cursor = "pointer";
-    S.zIndex = "99999";
+    S.zIndex = "2147483647";
     S.boxShadow = "0 0 14px rgba(79,195,247,.4)";
     S.transition = "all .2s";
     S.userSelect = "none";
+    S.pointerEvents = "auto";
+    S.touchAction = "manipulation";
+    S.padding = "0";
+    S.fontFamily = "inherit";
+    S.lineHeight = "1";
     b.onmouseenter = () => {
       S.transform = "scale(1.15)";
       S.boxShadow = "0 0 24px rgba(79,195,247,.7)";
@@ -662,12 +824,14 @@
       S.transform = "";
       S.boxShadow = "0 0 14px rgba(79,195,247,.4)";
     };
-    b.onclick = () => {
+    b.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       if (processor && !state.effectActive) {
         processor._trigger();
         S.borderColor = state.visible ? "#4fc3f7" : "#ff5722";
       }
-    };
+    });
     document.body.appendChild(b);
   }
 

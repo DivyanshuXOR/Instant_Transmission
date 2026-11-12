@@ -1,12 +1,12 @@
-"""Instant Transmission for Google Meet.
+"""Instant Transmission for Video Calls (Meet, Zoom, Teams, Discord & more).
 
 Hold two fingers (index + middle) against your forehead for ~1 second and you
 vanish from the video with a Goku-style Instant Transmission effect: charging
-aura, afterimage streak, white flash, and particle disintegration.  Do it again
+aura, afterimage streak, white flash, and particle disintegration. Do it again
 to reappear (particles coalesce).
 
 Pipeline: webcam -> MediaPipe (face + hand + person mask) -> effect ->
-pyvirtualcam ("OBS Virtual Camera") -> pick that camera in Google Meet.
+pyvirtualcam ("OBS Virtual Camera") -> pick that camera in any video-call app.
 
 Usage:
     pip install -r requirements.txt

@@ -8,31 +8,61 @@
 (() => {
   "use strict";
 
+  const workerUrl = chrome.runtime.getURL("gesture/gesture-worker.html");
+
   // Pass extension URL to MAIN world
   window.postMessage(
     {
       type: "IT_INIT_CONFIG",
-      workerUrl: chrome.runtime.getURL("gesture/gesture-worker.html"),
+      workerUrl,
     },
     "*"
   );
 
+  // MAIN world can request the config again if its listener was installed
+  // after the initial document_start message.
+  window.addEventListener("message", (e) => {
+    if (e.source === window && e.data?.type === "IT_REQUEST_CONFIG") {
+      window.postMessage({ type: "IT_INIT_CONFIG", workerUrl }, "*");
+    }
+  });
+
   // popup → page
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg?.type?.startsWith("IT_")) {
-      window.postMessage(msg, "*");
-
       // If popup asks for state, wait briefly for reply from MAIN world
       if (msg.type === "IT_GET_STATE") {
         const handler = (e) => {
-          if (e.data?.type === "IT_STATE") {
+          if (e.source === window && e.data?.type === "IT_STATE") {
             window.removeEventListener("message", handler);
             sendResponse(e.data);
           }
         };
         window.addEventListener("message", handler);
+        window.postMessage(msg, "*");
+        setTimeout(() => {
+          window.removeEventListener("message", handler);
+        }, 1200);
         return true;
       }
+
+      // If popup captures background, return result
+      if (msg.type === "IT_CAPTURE_BG") {
+        const handler = (e) => {
+          if (e.source === window && e.data?.type === "IT_CAPTURE_BG_REPLY") {
+            window.removeEventListener("message", handler);
+            sendResponse(e.data);
+          }
+        };
+        window.addEventListener("message", handler);
+        window.postMessage(msg, "*");
+        setTimeout(() => {
+          window.removeEventListener("message", handler);
+        }, 1500);
+        return true;
+      }
+
+      window.postMessage(msg, "*");
     }
   });
 

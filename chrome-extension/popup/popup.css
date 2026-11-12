@@ -197,3 +197,51 @@ kbd {
   color: #6e7681;
   line-height: 1.4;
 }
+
+.platform-badge {
+  margin-left: auto;
+  padding: 2px 8px;
+  background: linear-gradient(135deg, #1a3a4a, #162d3e);
+  border: 1px solid #4fc3f7;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #81d4fa;
+  white-space: nowrap;
+}
+
+.supported-sites {
+  margin-top: 8px;
+  font-size: 10px;
+  color: #484f58;
+  line-height: 1.5;
+}
+
+.supported-label {
+  color: #6e7681;
+  font-weight: 600;
+}
+
+.popup-toast {
+  padding: 8px 12px;
+  background: #2a1414;
+  border: 1px solid #f85149;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #ff7b72;
+  margin-bottom: 10px;
+  text-align: center;
+  line-height: 1.4;
+  animation: fadeIn 0.2s ease;
+}
+
+.popup-toast.success {
+  background: #102619;
+  border-color: #3fb950;
+  color: #7ee787;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
